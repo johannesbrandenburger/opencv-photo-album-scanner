@@ -256,7 +256,7 @@ class DocScanner(object):
         ax.set_title(('Drag the corners of the box to the corners of the document. \n'
             'Close the window when finished.'))
         p = poly_i.PolygonInteractor(ax, poly)
-        plt.imshow(rescaled_image)
+        plt.imshow(cv2.cvtColor(rescaled_image, cv2.COLOR_BGR2RGB))
         plt.show()
 
         new_points = p.get_poly_points()[:4]
@@ -287,19 +287,9 @@ class DocScanner(object):
         # apply the perspective transformation
         warped = transform.four_point_transform(orig, screenCnt * ratio)
 
-        # convert the warped image to grayscale
-        gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-
-        # sharpen image
-        sharpen = cv2.GaussianBlur(gray, (0,0), 3)
-        sharpen = cv2.addWeighted(gray, 1.5, sharpen, -0.5, 0)
-
-        # apply adaptive threshold to get black and white effect
-        thresh = cv2.adaptiveThreshold(sharpen, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 21, 15)
-
         # save the transformed image
         basename = os.path.basename(image_path)
-        cv2.imwrite(OUTPUT_DIR + '/' + basename, thresh)
+        cv2.imwrite(OUTPUT_DIR + '/' + basename, warped)
         print("Proccessed " + basename)
 
 
