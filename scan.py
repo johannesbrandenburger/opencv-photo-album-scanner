@@ -266,7 +266,6 @@ class DocScanner(object):
     def scan(self, image_path):
 
         RESCALED_HEIGHT = 500.0
-        OUTPUT_DIR = 'output'
 
         # load the image and compute the ratio of the old height
         # to the new height, clone it, and resize it
@@ -287,23 +286,17 @@ class DocScanner(object):
         # apply the perspective transformation
         warped = transform.four_point_transform(orig, screenCnt * ratio)
 
-        # save the transformed image
-        basename = os.path.basename(image_path)
-        cv2.imwrite(OUTPUT_DIR + '/' + basename, warped)
-        print("Proccessed " + basename)
-
+        return warped
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     group = ap.add_mutually_exclusive_group(required=True)
     group.add_argument("--images", help="Directory of images to be scanned")
-    group.add_argument("--image", help="Path to single image to be scanned")
     ap.add_argument("-i", action='store_true',
         help = "Flag for manually verifying and/or setting document corners")
 
     args = vars(ap.parse_args())
     im_dir = args["images"]
-    im_file_path = args["image"]
     interactive_mode = args["i"]
 
     scanner = DocScanner(interactive_mode)
@@ -312,12 +305,53 @@ if __name__ == "__main__":
 
     get_ext = lambda f: os.path.splitext(f)[1].lower()
 
-    # Scan single image specified by command line argument --image <IMAGE_PATH>
-    if im_file_path:
-        scanner.scan(im_file_path)
+    OUTPUT_DIR = 'output'
 
     # Scan all valid images in directory specified by command line argument --images <IMAGE_DIR>
-    else:
-        im_files = [f for f in os.listdir(im_dir) if get_ext(f) in valid_formats]
-        for im in im_files:
-            scanner.scan(im_dir + '/' + im)
+    im_files = [f for f in os.listdir(im_dir) if get_ext(f) in valid_formats]
+
+    # if output directory does not exist, create it
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+
+    i = 0
+    j = 0
+    while True:
+
+        if i >= len(im_files):
+            break
+
+        im = im_files[i]
+        image_path = os.path.join(im_dir, f"{im}")
+
+        print(f"Scanning {image_path}...")
+
+        transformed_image = scanner.scan(image_path)
+
+        # show the image again and ask the user to press a key:
+        # - q: to quit
+        # - s: to save the transformed image
+        # - a: to save the transformed image but call the image again (if 2 pictures of one document are taken)
+        # - r: to call the image again
+        # - esc: to go on withou saving the transformed image
+        cv2.imshow("Scanned (q: quit, s: save, a: save and call again, r: call again, esc: skip)", transformed_image)
+        key = cv2.waitKey(0) & 0xFF
+        output_path = os.path.join(OUTPUT_DIR, f"{os.path.splitext(im)[0]}_{j}{get_ext(im)}")
+
+        if key == ord("q"):
+            cv2.destroyAllWindows()
+            break
+        elif key == ord("s"):
+            cv2.imwrite(output_path, transformed_image)
+            i += 1
+            j = 0
+        elif key == ord("a"):
+            cv2.imwrite(output_path, transformed_image)
+            j += 1
+        elif key == ord("r"):
+            pass
+        elif key == 27:
+            i += 1
+            j = 0
+
+        cv2.destroyAllWindows()
